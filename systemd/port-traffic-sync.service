@@ -1,0 +1,9 @@
+[Unit]
+Description=Checkpoint per-port traffic counters
+After=port-traffic.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/port-traffic sync
+TimeoutStartSec=45
+UMask=0077

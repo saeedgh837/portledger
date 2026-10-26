@@ -1,0 +1,31 @@
+# Local operations and deployment evidence
+/ops/
+/DESIGN.md
+/deployment-verification.txt
+/final-server-check.txt
+
+# Generated bundles and Python caches
+*.tar.gz
+*.tgz
+*.zip
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Credentials and runtime accounting data
+.env
+.env.*
+*.pem
+*.key
+/state.json
+/state/
+/backups/
+*.lock
+
+# Local editor and agent settings
+.vscode/
+.idea/
+.claude/
+.DS_Store
+Thumbs.db

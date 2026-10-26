@@ -1,0 +1,17 @@
+[Unit]
+Description=Restore persistent per-port traffic accounting
+Wants=network-pre.target
+After=local-fs.target nftables.service
+Before=network-pre.target network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/port-traffic restore
+ExecStop=/usr/local/sbin/port-traffic sync
+TimeoutStartSec=45
+TimeoutStopSec=45
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

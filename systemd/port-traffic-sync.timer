@@ -1,0 +1,13 @@
+[Unit]
+Description=Save per-port traffic counters every ten seconds
+Requires=port-traffic.service
+After=port-traffic.service
+
+[Timer]
+OnBootSec=15s
+OnUnitActiveSec=10s
+AccuracySec=1s
+Unit=port-traffic-sync.service
+
+[Install]
+WantedBy=timers.target
