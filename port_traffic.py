@@ -318,6 +318,7 @@ def make_report(state, port, zone="UTC"):
               ("last_30_days", (epoch - 30 * 86400) // BUCKET_SECONDS * BUCKET_SECONDS)]
     history = entry.get("history", history_start(now.isoformat(timespec="seconds")))
     coverage = max(int(timestamp(history["since"]).timestamp()), history["retained_since"])
+    port_since_epoch = int(timestamp(entry["since"]).timestamp())
     rows = []
     for key, start in starts:
         rx = tx = 0
@@ -325,9 +326,15 @@ def make_report(state, port, zone="UTC"):
             if start // BUCKET_SECONDS * BUCKET_SECONDS <= minute <= epoch:
                 rx += upload
                 tx += download
+        if start <= port_since_epoch:
+            unbucketed_rx = max(0, entry["rx_bytes"] - sum(b[1] for b in history["buckets"]))
+            unbucketed_tx = max(0, entry["tx_bytes"] - sum(b[2] for b in history["buckets"]))
+            rx += unbucketed_rx
+            tx += unbucketed_tx
         reasons = []
         status = "complete"
-        if coverage > start:
+        effective_start = max(start, port_since_epoch)
+        if coverage > effective_start:
             status = "partial"
             reasons.append("History does not cover the entire period")
         if any(left <= epoch and right >= start for left, right in history["gaps"]):
@@ -1504,7 +1511,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
     const STATUS_MAP = {
       'complete': { label: 'کامل', class: 'complete' },
-      'partial': { label: 'بخشی', class: 'partial' },
+      'recorded': { label: 'ثبت‌شده (مجموع)', class: 'complete' },
+      'partial': { label: 'پایش از مبدا', class: 'partial' },
       'incomplete': { label: 'ناقص (وقفه/تغییر ساعت)', class: 'incomplete' }
     };
 
@@ -1663,7 +1671,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
               <td class="num-cell upload-val">${formatGB(r.upload_gb)}</td>
               <td class="num-cell total-val">${formatGB(r.total_gb)}</td>
               <td>
-                <span class="status-badge ${st.class}">
+                <span class="status-badge ${st.class}" title="${(r.reasons && r.reasons.length) ? r.reasons.join(' | ') : st.label}">
                   ${st.label}
                 </span>
               </td>

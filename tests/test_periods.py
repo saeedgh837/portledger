@@ -293,6 +293,26 @@ class WindowTests(unittest.TestCase):
         self.assertEqual(report["timezone"], "UTC")
         self.assertEqual(report["bucket_seconds"], 60)
 
+    def test_periods_longer_than_port_lifetime_include_full_balance(self):
+        # A port created 1 day ago has total_bytes = 28 GB, but history only recorded 12 GB.
+        # Periods starting before port creation (7 days, 30 days) must reflect the full 28 GB balance.
+        s = baseline("2026-10-27T12:00:00")
+        entry = s["ports"]["8443"]
+        entry["since"] = stamp("2026-10-26T12:00:00")
+        entry["rx_bytes"] = 5_000_000_000
+        entry["tx_bytes"] = 23_000_000_000
+        entry["history"] = {
+            "since": stamp("2026-10-27T00:00:00"),
+            "retained_since": int(datetime.fromisoformat(stamp("2026-10-27T00:00:00")).timestamp()),
+            "buckets": [[int(datetime.fromisoformat(stamp("2026-10-27T06:00:00")).timestamp()), 2_000_000_000, 10_000_000_000]],
+            "gaps": [],
+        }
+        report = pt.make_report(s, "8443")
+        rows = {r["key"]: r for r in report["periods"]}
+        self.assertEqual(rows["last_7_days"]["total_bytes"], 28_000_000_000)
+        self.assertEqual(rows["last_30_days"]["total_bytes"], 28_000_000_000)
+        self.assertEqual(rows["all_time"]["total_bytes"], 28_000_000_000)
+
 
 class TableTests(unittest.TestCase):
     def render(self, **kwargs):
