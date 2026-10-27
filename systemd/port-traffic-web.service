@@ -1,0 +1,25 @@
+[Unit]
+Description=PortLedger Web Dashboard and REST API
+After=network.target port-traffic.service
+Wants=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/port-traffic web --host 127.0.0.1 --port 9090 --timezone Asia/Tehran
+Restart=always
+RestartSec=5
+UMask=0077
+
+# Security Hardening
+ProtectSystem=strict
+ProtectHome=yes
+ReadOnlyPaths=/var/lib/port-traffic
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

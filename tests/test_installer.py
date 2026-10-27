@@ -25,6 +25,8 @@ class InstallerTests(unittest.TestCase):
         self.base.mkdir()
         shutil.copy(ROOT / "port_traffic.py", self.base / "port_traffic.py")
         shutil.copytree(ROOT / "systemd", self.base / "systemd")
+        if (ROOT / "nginx").exists():
+            shutil.copytree(ROOT / "nginx", self.base / "nginx")
         script = (ROOT / "install.sh").read_text()
         for source, target in (("/var/lib/port-traffic", str(self.state)),
                                ("/usr/local/sbin/port-traffic", str(self.target)),
