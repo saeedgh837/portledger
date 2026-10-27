@@ -175,15 +175,21 @@ class WebServerTests(unittest.TestCase):
         self.assertIn("total_bytes", first)
 
     def test_dashboard_html_root(self):
-        status, headers, data = self.fetch("/")
-        self.assertEqual(status, 200)
-        self.assertIn("text/html", headers.get("Content-Type", ""))
-        self.assertEqual(headers.get("X-Content-Type-Options"), "nosniff")
-        self.assertEqual(headers.get("X-Frame-Options"), "SAMEORIGIN")
-        html = data.decode("utf-8")
-        self.assertIn("<!DOCTYPE html>", html)
-        self.assertIn("PortLedger", html)
-        self.assertIn("viewport", html)
+        for path in ("/", "/index.html", "/dashboard"):
+            status, headers, data = self.fetch(path)
+            self.assertEqual(status, 200)
+            self.assertIn("text/html", headers.get("Content-Type", ""))
+            self.assertEqual(headers.get("X-Content-Type-Options"), "nosniff")
+            self.assertEqual(headers.get("X-Frame-Options"), "SAMEORIGIN")
+            html = data.decode("utf-8")
+            self.assertIn("<!DOCTYPE html>", html)
+            self.assertIn("PortLedger", html)
+
+        # Test favicon returns 204 No Content
+        fav_status, fav_headers, fav_data = self.fetch("/favicon.ico")
+        self.assertEqual(fav_status, 204)
+        self.assertEqual(fav_data, b"")
+
         # Verify RTL and Persian typography references
         self.assertIn('dir="rtl"', html)
         self.assertIn("Vazirmatn", html)

@@ -603,7 +603,11 @@ class WebHandler(BaseHTTPRequestHandler):
         path = parsed.path.rstrip("/") or "/"
         query = urllib.parse.parse_qs(parsed.query)
 
-        if path == "/":
+        if not path.startswith("/api/"):
+            if path == "/favicon.ico":
+                self.send_response(204)
+                self.end_headers()
+                return
             self.send_html(200, DASHBOARD_HTML)
             return
 
