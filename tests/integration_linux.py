@@ -230,6 +230,104 @@ class KernelIntegrationTests(unittest.TestCase):
             self.meter.sync()
         self.assertEqual(pt.read_state(self.meter.path), saved)
 
+    def test_fresh_ports_record_history_from_first_traffic(self):
+        self.udp_exchange(socket.AF_INET)
+        report = self.report()
+        self.assertEqual(report["periods"][0]["total_bytes"], 356)
+        saved = pt.read_state(self.meter.path)
+        self.assertEqual(saved["version"], 2)
+        self.assertIsInstance(saved["last_monotonic_ns"], int)
+        self.assertEqual(sum(b[1] + b[2] for b in saved["ports"][str(PORT)]["history"]["buckets"]), 356)
+        self.meter.add(str(PORT + 1), "lo")
+        self.udp_exchange(socket.AF_INET, PORT + 1)
+        saved = self.meter.sync()
+        self.assertEqual(pt.make_report(saved, str(PORT + 1))["periods"][0]["total_bytes"], 356)
+
+    def test_boot_rebase_marks_short_gap_without_false_monotonic_jump(self):
+        saved = self.meter.sync()
+        saved["boot_id"] = "previous-boot"
+        saved["last_monotonic_ns"] = 10**30
+        pt.save_state(self.meter.path, saved)
+        report = self.report()
+        self.assertEqual(report["periods"][0]["status"], "incomplete")
+        self.assertTrue(any(e["kind"] == "boot_rebase" for e in report["warnings"]))
+        self.assertFalse(any(e["kind"] == "clock_change" for e in report["warnings"]))
+
+    def test_reporting_options_work_for_shortcut_list_and_add(self):
+        self.udp_exchange(socket.AF_INET)
+        cli = [sys.executable, str(ROOT / "port_traffic.py"), "--state-dir", self.tmp.name]
+        text = run(*cli, str(PORT), "--timezone", "Asia/Tehran", "--color", "always")
+        self.assertIn("Today", text)
+        self.assertIn("Asia/Tehran", text)
+        self.assertIn("\x1b[", text)
+        report = run(*cli, "list", "--timezone", "Asia/Tehran", "--color", "always", "--json")
+        self.assertNotIn("\x1b", report)
+        self.assertEqual(json.loads(report)[0]["timezone"], "Asia/Tehran")
+        text = run(*cli, "add", str(PORT), "--timezone", "UTC", "--color", "never")
+        self.assertNotIn("\x1b", text)
+        self.assertIn("356", text)
+
+    def test_invalid_timezone_leaves_state_and_kernel_unchanged(self):
+        before = self.meter.path.read_bytes()
+        snap = self.meter.snapshot()
+        command = [sys.executable, str(ROOT / "port_traffic.py"), "--state-dir", self.tmp.name,
+                   "add", str(PORT + 1), "--timezone", "Not/A_Zone"]
+        result = subprocess.run(command, text=True, capture_output=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("timezone", result.stderr)
+        self.assertEqual(self.meter.path.read_bytes(), before)
+        self.assertEqual(self.meter.snapshot(), snap)
+
+    def test_legacy_live_upgrade_does_not_allocate_old_delta_to_today(self):
+        saved = self.meter.sync()
+        saved["version"] = 1
+        saved.pop("last_monotonic_ns", None)
+        for entry in saved["ports"].values():
+            entry.pop("history", None)
+            entry.update(rx_bytes=1000, tx_bytes=2000)
+        pt.save_state(self.meter.path, saved)
+        self.udp_exchange(socket.AF_INET)
+        report = self.report()
+        self.assertEqual(report["total_bytes"], 3356)
+        self.assertEqual(report["periods"][0]["total_bytes"], 0)
+        self.assertEqual(report["periods"][0]["status"], "partial")
+        self.udp_exchange(socket.AF_INET)
+        report = self.report()
+        self.assertEqual(report["total_bytes"], 3712)
+        self.assertEqual(report["periods"][0]["total_bytes"], 356)
+
+    def test_commandless_custom_state_directory_shows_default_report(self):
+        self.udp_exchange(socket.AF_INET)
+        result = subprocess.run([sys.executable, str(ROOT / "port_traffic.py"), "--state-dir", self.tmp.name],
+                                text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        text = result.stdout
+        self.assertIn("Today", text)
+        self.assertIn("All time", text)
+        self.assertIn("356", text)
+
+    def test_delayed_first_port_installation_marks_unmonitored_interval(self):
+        run("nft", "delete", "table", "inet", "port_traffic")
+        self.meter.path.unlink()
+        real = self.meter.transaction
+        def interrupt_port_install(script):
+            if f"p{PORT}_rx" in script:
+                raise RuntimeError("interrupted install")
+            return real(script)
+        with patch.object(pt, "utcnow", return_value="2026-10-01T00:00:00+00:00"), \
+                patch.object(self.meter, "transaction", side_effect=interrupt_port_install):
+            with self.assertRaises(RuntimeError):
+                self.meter.add(str(PORT), "lo")
+        saved = pt.read_state(self.meter.path)
+        self.assertIsNone(saved["last_sync"])
+        self.assertTrue(saved["ports"][str(PORT)]["pending"])
+        with patch.object(pt, "utcnow", return_value="2026-10-03T12:00:00+00:00"):
+            saved = self.meter.sync()
+        report = pt.make_report(saved, str(PORT))
+        self.assertEqual(report["total_bytes"], 0)
+        self.assertEqual(report["periods"][0]["status"], "incomplete")
+        self.assertEqual(report["periods"][1]["status"], "incomplete")
+
     def test_shortcut_cli_and_all_ports_cli(self):
         self.udp_exchange(socket.AF_INET)
         text = run(sys.executable, str(ROOT / "port_traffic.py"), "--state-dir", self.tmp.name, str(PORT))

@@ -1,8 +1,8 @@
 # PortLedger
 
-Per-port traffic accounting for Ubuntu servers. Track cumulative upload, download,
-and their total in decimal gigabytes without restarting a tunnel service or
-replacing the existing firewall.
+Per-port traffic accounting for Ubuntu servers. See today's usage, the last
+24 hours, seven days, 30 days, and all-time upload/download in a colored terminal
+table, without restarting a tunnel service or replacing the existing firewall.
 
 [راهنمای فارسی](README-fa.md) · [Accounting design](docs/architecture.md)
 
@@ -77,8 +77,59 @@ sudo port-traffic add 8443 --interface eth0
 sudo port-traffic 8443
 ```
 
-The report contains `Upload`, `Download`, `TOTAL`, `Exact total bytes`, and
-`Since (UTC)`. One GB is exactly **1,000,000,000 bytes**, not one GiB.
+The report has **Download (GB)**, **Upload (GB)**, **Total (GB)**, and **History**
+columns, plus the exact all-time byte count and accounting/history start times.
+One GB is exactly **1,000,000,000 bytes**, not one GiB.
+
+| Row | Meaning |
+| --- | --- |
+| Today | Calendar midnight to now, in the selected timezone |
+| Last 24 hours | Rolling 24-hour window |
+| Last 7 days | Rolling seven-day window |
+| Last 30 days | Rolling 30-day window, not the previous calendar month |
+| All time | Cumulative balance since the port was registered |
+
+Period history is retained for 31 days at one-minute resolution. Rolling starts
+are rounded down to the minute, so a window may include almost one extra minute.
+Traffic is attributed to its observation minute, normally sampled every ten
+seconds; packet-level historical timestamps are not available.
+
+**Read the History column:** `Complete` means the period is covered by retained
+samples. `Partial` means history began after the period started. `Incomplete`
+means a sampling gap, counter recovery, or clock change overlaps the period.
+These values are recorded observations, not reconstructed usage or guaranteed
+lower bounds. `Recorded` is the normal all-time status; accounting warnings mark
+it `Incomplete`. Review warnings before relying on a report for billing.
+
+### Timezone and colors
+
+UTC is the default. To make Today follow midnight in Tehran:
+
+```bash
+sudo port-traffic 8443 --timezone Asia/Tehran
+```
+
+An IANA timezone requires system timezone data (the Ubuntu `tzdata` package).
+Changing the timezone affects Today, not the duration of the rolling windows.
+
+Colors use cyan for download, magenta for upload, green for totals, and yellow
+for partial/incomplete history. Text labels remain visible without color.
+`--color auto` is the default: colors appear only in a terminal, and respect
+`NO_COLOR` (even empty) and `TERM=dumb`.
+
+```bash
+sudo port-traffic 8443 --color always
+```
+
+```bash
+sudo port-traffic list --color never
+```
+
+`add`, `show`, `list`, and the numeric shortcut accept `--timezone` and `--color`.
+`--json` always emits plain JSON, even with `--color always`. Original top-level
+cumulative fields remain compatible; new `periods` rows include byte/GB values,
+UTC `start`/`end`, `status`, and `reasons`. Additional metadata includes `timezone`,
+`bucket_seconds`, `history_since`, and `retained_since`.
 
 If `--interface` is omitted, the meter selects the unique interface from the
 IPv4 default routes. Ambiguous default interfaces require an explicit choice.
@@ -170,6 +221,22 @@ sudo cp -p /var/lib/port-traffic/state.json /root/port-traffic-state-backup.json
 Installer snapshots are stored under `/var/lib/port-traffic/backups/` in separate,
 collision-free directories. They contain potentially sensitive firewall details;
 keep them private. A snapshot is not a safe instruction to replay live counters.
+
+## Upgrading existing accounts
+
+Run the installer from the new checkout. It checkpoints with the installed
+executable and backs up state before replacing it. The first new checkpoint
+migrates version-1 state to version 2, preserving cumulative balances and the
+latest kernel delta. That legacy delta belongs only to All time: no old daily or
+rolling history can be recovered. Period rows initially show `Partial` and begin
+filling from the upgrade onward.
+
+Keep the executable and state backups together. **Do not downgrade the executable
+against version-2 state or restore an older state over live accounting.** The
+original version-1 reader refuses version-2 state, and restoring an old checkpoint
+can discard newer balances or replay raw counter deltas. Rollback requires a
+planned, compatible state migration; the private backup is not a live rollback
+command.
 
 ## Tests
 

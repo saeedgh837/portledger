@@ -55,6 +55,54 @@ in an nft transaction. Recovery distinguishes absent, fully installed, and parti
 installed counter pairs. This makes an interrupted add recoverable without
 zeroing existing cumulative balances.
 
+## Period history and reporting
+
+State schema version 2 stores authoritative balances, raw baselines, sparse UTC
+minute-delta buckets, coverage metadata, uncertainty intervals, and the last
+same-boot monotonic observation in the same atomic JSON checkpoint. History is
+not a separately committed database. Zero-traffic minutes need no bucket;
+coverage advances through successful samples even when usage is zero.
+
+Each port's `history` contains `since`, a nondecreasing `retained_since` floor,
+`buckets` of `[minute_epoch, upload_bytes, download_bytes]`, and merged `gaps` of
+`[start_epoch, end_epoch]`. Buckets are sorted and unique. All byte values are
+nonnegative integers, and retained history cannot exceed the cumulative balance.
+History retention is 31 days; pruning never changes the all-time counters.
+
+The first successful version-1 sample migrates state to version 2. It charges the
+latest raw delta to the cumulative balance, then starts empty history at that
+observation. It never invents historical timestamps for legacy usage. Fresh
+version-2 ports record their first sampled delta in history.
+
+`Today` starts at calendar midnight in the selected IANA timezone (`UTC` by
+default), including daylight-saving transitions. Rolling windows span 24 hours,
+seven days, and 30 days, with starts rounded down to UTC minute boundaries.
+Deltas are assigned to the minute when sampled, not divided among estimated
+packet timestamps. Future-minute buckets are excluded from current windows.
+
+Reports distinguish `complete` coverage, `partial` coverage that starts after the
+window, and `incomplete` windows overlapping a sampling/recovery/clock gap.
+Intervals longer than 120 seconds, counter resets, generation recovery, and boot
+rebasing mark uncertainty. Wall-clock rollback or divergence from same-boot
+monotonic elapsed time also marks uncertainty. Boot rebasing clears the previous
+monotonic baseline. A clock-change observation does not prune retained history.
+
+Incomplete values are neither guaranteed lower bounds nor exact period usage:
+delayed observations can move earlier traffic into a later period. All-time uses
+only authoritative balances and is marked incomplete when accounting events
+exist. Original cumulative JSON keys remain available; `periods` and history,
+timezone, and resolution metadata are additive.
+
+Text output has five rows and download/upload/total columns. ANSI colors are
+optional and supplement textual status. Auto color requires a TTY, no `NO_COLOR`
+variable, and a non-`dumb` terminal. JSON never includes ANSI codes.
+
+Continuous traffic can create about 44,640 minute buckets per port over 31 days.
+The ten-second timer rewrites the atomic JSON checkpoint about 8,640 times daily.
+For large deployments, measure storage and checkpoint latency; a future SQLite
+migration must move all authoritative accounting together, not split transactions
+between JSON balances and a second history store.
+
 ## Installation
 
 The installer runs the unit/installer suite before installing files. A separate
@@ -64,6 +112,12 @@ systemd files, the firewall snapshot, and an existing checkpoint are backed up.
 The installer validates the new units, reloads systemd, and enables restoration
 and the checkpoint timer. It does not choose a port, flush the firewall, or
 restart a tunnel service.
+
+Before replacing an existing executable, the installer uses it to sync and backs
+up the checkpoint. The new writer migrates version-1 state on its first sample.
+The old version-1 reader rejects version-2 state; it must not be reinstalled as a
+live downgrade. Restoring an older state can discard balances or replay deltas.
+Keep state/code backups together and design compatible rollback explicitly.
 
 ## Limits
 
