@@ -187,6 +187,10 @@ class WebServerTests(unittest.TestCase):
         # Verify RTL and Persian typography references
         self.assertIn('dir="rtl"', html)
         self.assertIn("Vazirmatn", html)
+        # Verify port selection string coercion to avoid integer vs string tab filtering bugs
+        self.assertIn("String(p.port) === currentSelectedPort", html)
+        self.assertIn("currentSelectedPort === String(p.port)", html)
+        self.assertIn("currentSelectedPort = String(port);", html)
 
     def test_head_requests(self):
         req = urllib.request.Request(f"{self.base_url}/", method="HEAD")

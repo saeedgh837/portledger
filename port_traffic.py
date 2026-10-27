@@ -1569,7 +1569,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       const container = document.getElementById('port-tabs-container');
       let html = `<button class="port-tab ${currentSelectedPort === 'all' ? 'active' : ''}" onclick="selectPort('all')">همه پورت‌ها</button>`;
       for (const p of ports) {
-        const activeClass = currentSelectedPort === p.port ? 'active' : '';
+        const activeClass = currentSelectedPort === String(p.port) ? 'active' : '';
         html += `<button class="port-tab ${activeClass}" onclick="selectPort('${p.port}')">
           پورت ${p.port}
           <span class="tab-badge">${formatGB(p.total_gb)} GB</span>
@@ -1579,7 +1579,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     }
 
     function selectPort(port) {
-      currentSelectedPort = port;
+      currentSelectedPort = String(port);
       renderTabs(allPortsData);
       renderPorts(allPortsData);
     }
@@ -1629,7 +1629,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
     function renderPorts(ports) {
       const container = document.getElementById('ports-details-container');
-      const filtered = currentSelectedPort === 'all' ? ports : ports.filter(p => p.port === currentSelectedPort);
+      const filtered = currentSelectedPort === 'all'
+        ? ports
+        : ports.filter(p => String(p.port) === currentSelectedPort);
 
       if (filtered.length === 0) {
         container.innerHTML = '<div style="text-align:center; padding: 40px; color: var(--text-muted);">هیچ پورتی یافت نشد.</div>';
