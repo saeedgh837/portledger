@@ -1410,10 +1410,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           </div>
         </div>
         <div class="kpi-value-row">
-          <span id="kpi-total-gb" class="kpi-value">۰.۰۰</span>
+          <span id="kpi-total-gb" class="kpi-value">0.00</span>
           <span class="kpi-unit">گیگابایت</span>
         </div>
-        <div id="kpi-total-bytes" class="kpi-subtext">۰ بایت</div>
+        <div id="kpi-total-bytes" class="kpi-subtext">0 بایت</div>
       </div>
 
       <div class="kpi-card emerald">
@@ -1424,10 +1424,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           </div>
         </div>
         <div class="kpi-value-row">
-          <span id="kpi-dl-gb" class="kpi-value">۰.۰۰</span>
+          <span id="kpi-dl-gb" class="kpi-value">0.00</span>
           <span class="kpi-unit">گیگابایت</span>
         </div>
-        <div id="kpi-dl-bytes" class="kpi-subtext">۰ بایت</div>
+        <div id="kpi-dl-bytes" class="kpi-subtext">0 بایت</div>
       </div>
 
       <div class="kpi-card violet">
@@ -1438,10 +1438,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           </div>
         </div>
         <div class="kpi-value-row">
-          <span id="kpi-ul-gb" class="kpi-value">۰.۰۰</span>
+          <span id="kpi-ul-gb" class="kpi-value">0.00</span>
           <span class="kpi-unit">گیگابایت</span>
         </div>
-        <div id="kpi-ul-bytes" class="kpi-subtext">۰ بایت</div>
+        <div id="kpi-ul-bytes" class="kpi-subtext">0 بایت</div>
       </div>
 
       <div class="kpi-card slate">
@@ -1452,7 +1452,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           </div>
         </div>
         <div class="kpi-value-row">
-          <span id="kpi-ports-count" class="kpi-value">۰</span>
+          <span id="kpi-ports-count" class="kpi-value">0</span>
           <span class="kpi-unit">پورت</span>
         </div>
         <div id="kpi-last-sync" class="kpi-subtext">آخرین بررسی: در انتظار داده</div>
@@ -1492,9 +1492,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   <script>
     const PERIOD_LABELS = {
       'today': 'امروز (از بامداد محلی)',
-      'last_24_hours': '۲۴ ساعت گذشته',
-      'last_7_days': '۷ روز گذشته',
-      'last_30_days': '۳۰ روز گذشته',
+      'last_24_hours': '24 ساعت گذشته',
+      'last_7_days': '7 روز گذشته',
+      'last_30_days': '30 روز گذشته',
       'all_time': 'از ابتدای پایش'
     };
 
@@ -1504,15 +1504,15 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       'incomplete': { label: 'ناقص (وقفه/تغییر ساعت)', class: 'incomplete' }
     };
 
-    function toPersianDigits(n) {
-      if (n === null || n === undefined) return '';
-      const p = ['۰','۱','۲','۳','۴','۵','۶','۷','۸','۹'];
-      return n.toString().replace(/[0-9]/g, w => p[+w]);
+    function formatGB(val) {
+      if (val === null || val === undefined || val === '') return '0.00';
+      const num = Number(val);
+      return isNaN(num) ? '0.00' : num.toFixed(2);
     }
 
     function formatNumber(num) {
-      if (num === null || num === undefined) return '۰';
-      return toPersianDigits(new Intl.NumberFormat('en-US').format(num));
+      if (num === null || num === undefined) return '0';
+      return new Intl.NumberFormat('en-US').format(num);
     }
 
     let currentSelectedPort = 'all';
@@ -1549,19 +1549,19 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
     function renderOverview(data) {
       document.getElementById('header-interface').textContent = data.interface || 'eth0';
-      document.getElementById('kpi-total-gb').textContent = toPersianDigits(data.total_gb);
+      document.getElementById('kpi-total-gb').textContent = formatGB(data.total_gb);
       document.getElementById('kpi-total-bytes').textContent = formatNumber(data.total_bytes) + ' بایت';
 
-      document.getElementById('kpi-dl-gb').textContent = toPersianDigits(data.download_gb);
+      document.getElementById('kpi-dl-gb').textContent = formatGB(data.download_gb);
       document.getElementById('kpi-dl-bytes').textContent = formatNumber(data.download_bytes) + ' بایت';
 
-      document.getElementById('kpi-ul-gb').textContent = toPersianDigits(data.upload_gb);
+      document.getElementById('kpi-ul-gb').textContent = formatGB(data.upload_gb);
       document.getElementById('kpi-ul-bytes').textContent = formatNumber(data.upload_bytes) + ' بایت';
 
-      document.getElementById('kpi-ports-count').textContent = toPersianDigits(data.ports ? data.ports.length : 0);
+      document.getElementById('kpi-ports-count').textContent = formatNumber(data.ports ? data.ports.length : 0);
       if (data.last_sync) {
         const d = new Date(data.last_sync);
-        document.getElementById('kpi-last-sync').textContent = 'آخرین ثبت: ' + toPersianDigits(d.toLocaleTimeString('fa-IR'));
+        document.getElementById('kpi-last-sync').textContent = 'آخرین ثبت: ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       }
     }
 
@@ -1571,8 +1571,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       for (const p of ports) {
         const activeClass = currentSelectedPort === p.port ? 'active' : '';
         html += `<button class="port-tab ${activeClass}" onclick="selectPort('${p.port}')">
-          پورت ${toPersianDigits(p.port)}
-          <span class="tab-badge">${toPersianDigits(p.total_gb)} GB</span>
+          پورت ${p.port}
+          <span class="tab-badge">${formatGB(p.total_gb)} GB</span>
         </button>`;
       }
       container.innerHTML = html;
@@ -1605,9 +1605,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         for (const b of buckets) {
           const dlPct = (b.download_bytes / maxVal) * 100;
           const ulPct = (b.upload_bytes / maxVal) * 100;
-          const timeStr = toPersianDigits(new Date(b.epoch * 1000).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }));
-          const dlKb = toPersianDigits((b.download_bytes / 1000).toFixed(1));
-          const ulKb = toPersianDigits((b.upload_bytes / 1000).toFixed(1));
+          const timeStr = new Date(b.epoch * 1000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+          const dlKb = (b.download_bytes / 1000).toFixed(2);
+          const ulKb = (b.upload_bytes / 1000).toFixed(2);
 
           barsHtml += `
             <div class="chart-bar-container">
@@ -1653,9 +1653,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                   <span>${periodName}</span>
                 </div>
               </td>
-              <td class="num-cell download-val">${toPersianDigits(r.download_gb)}</td>
-              <td class="num-cell upload-val">${toPersianDigits(r.upload_gb)}</td>
-              <td class="num-cell total-val">${toPersianDigits(r.total_gb)}</td>
+              <td class="num-cell download-val">${formatGB(r.download_gb)}</td>
+              <td class="num-cell upload-val">${formatGB(r.upload_gb)}</td>
+              <td class="num-cell total-val">${formatGB(r.total_gb)}</td>
               <td>
                 <span class="status-badge ${st.class}">
                   ${st.label}
@@ -1669,15 +1669,15 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <div class="port-detail-card" id="port-card-${p.port}">
             <div class="port-detail-header">
               <div class="port-title-meta">
-                <span class="port-number-badge">${toPersianDigits(p.port)}</span>
+                <span class="port-number-badge">${p.port}</span>
                 <div class="port-info-meta">
-                  <div style="font-weight: 700; font-size: 1rem;">پورت TCP/UDP ${toPersianDigits(p.port)}</div>
-                  <div class="port-since">آغاز ثبت: ${toPersianDigits(p.since || '-')}</div>
+                  <div style="font-weight: 700; font-size: 1rem;">پورت TCP/UDP ${p.port}</div>
+                  <div class="port-since">آغاز ثبت: ${p.since || '-'}</div>
                 </div>
               </div>
               <div style="display: flex; gap: 10px; align-items: center;">
                 <span style="font-size: 0.85rem; color: var(--text-secondary);">کل مصرف پورت:</span>
-                <span style="font-family: var(--font-mono); font-size: 1.1rem; font-weight: 700; color: var(--accent-cyan);">${toPersianDigits(p.total_gb)} GB</span>
+                <span style="font-family: var(--font-mono); font-size: 1.1rem; font-weight: 700; color: var(--accent-cyan);">${formatGB(p.total_gb)} GB</span>
               </div>
             </div>
 
