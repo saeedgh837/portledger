@@ -54,6 +54,12 @@ cd portledger
 Inspect the installer, then run it from the checkout:
 
 ```bash
+sudo sh install.sh --with-nginx --replace-default-site
+```
+
+To install without Nginx configuration (CLI and systemd units only):
+
+```bash
 sudo sh install.sh
 ```
 
@@ -63,6 +69,74 @@ boot restoration and periodic checkpoints. It does not flush the ruleset or rest
 tunnel services. Existing saved accounts are retained on reinstall.
 
 The installer does **not** register a port automatically.
+
+## Web Dashboard and REST API
+
+PortLedger includes a responsive, dark-mode single-page dashboard with RTL layout,
+English numerals, 2-decimal precision (`0.00 GB`), real-time minute activity charts,
+and a REST API.
+
+By default, the web daemon (`port-traffic-web.service`) listens on `127.0.0.1:9090`.
+
+### Option A: Standard Production Setup via Nginx (Port 80) — Recommended
+
+1. Install Nginx if not already installed:
+```bash
+sudo apt-get install -y nginx
+```
+
+2. Run installer with Nginx flags:
+```bash
+sudo sh install.sh --with-nginx --replace-default-site
+```
+
+3. Allow HTTP through the firewall:
+```bash
+sudo ufw allow 80/tcp
+```
+
+4. Register at least one port so the database is initialized:
+```bash
+sudo port-traffic add 8000
+```
+
+5. Open in your browser:
+```text
+http://<SERVER_IP>/
+```
+
+### Option B: Direct Access on Port 9090 (Without Nginx)
+
+If you prefer not to use Nginx and want direct browser access on port 9090:
+
+1. Update the systemd service to bind to all interfaces (`0.0.0.0`):
+```bash
+sudo sed -i 's/--host 127.0.0.1/--host 0.0.0.0/' /etc/systemd/system/port-traffic-web.service
+sudo systemctl daemon-reload && sudo systemctl restart port-traffic-web.service
+```
+
+2. Allow port 9090 through the firewall:
+```bash
+sudo ufw allow 9090/tcp
+```
+
+3. Register at least one port:
+```bash
+sudo port-traffic add 8000
+```
+
+4. Open in your browser:
+```text
+http://<SERVER_IP>:9090/
+```
+
+### REST API Endpoints
+
+- `GET /api/health` — Service status, interface, and sync timestamp.
+- `GET /api/overview` — Total cumulative download/upload/overall bandwidth across all ports.
+- `GET /api/ports?zone=Asia/Tehran` — 5-period breakdown (today, 24h, 7d, 30d, all-time) for all ports.
+- `GET /api/ports/<port>?zone=Asia/Tehran` — 5-period breakdown for a single port.
+- `GET /api/ports/<port>/history` — 1-minute historical activity buckets for charts.
 
 ## Quick start
 
